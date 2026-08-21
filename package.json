@@ -1,0 +1,25 @@
+{
+  "name": "psicologos-backend",
+  "version": "1.0.0",
+  "description": "Backend de la aplicación de gestión para psicólogos - TP Desarrollo de Software.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mmalenaaSp/psicologos-backend.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/mmalenaaSp/psicologos-backend/issues"
+  },
+  "homepage": "https://github.com/mmalenaaSp/psicologos-backend#readme",
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "prisma": "^7.9.1"
+  }
+}

@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// --- TABLAS CATÁLOGO ---
+
+model ColegioPsicologo {
+  id        Int         @id @default(autoincrement())
+  distrito  String
+  nombre    String
+  direccion String      // Agregado según tu nuevo diagrama
+  
+  psicologos Psicologo[]
+}
+
+model ObraSocial {
+  id            Int           @id @default(autoincrement())
+  codigo        String        @unique 
+  nombre        String
+  
+  pacientes     Paciente[]
+  liquidaciones Liquidacion[]
+  psicologos    Psicologo[]   
+}
+
+model TipoSesion {
+  id         Int      @id @default(autoincrement())
+  nombre     String
+  precioBase Decimal  @db.Decimal(10, 2)
+  turnos     Turno[]
+}
+
+model Lugar {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  direccion String
+  
+  turnos    Turno[]
+  psicologos Psicologo[] // Nueva relación directa desde Psicólogo (1..*)
+}
+
+// --- TABLAS PRINCIPALES ---
+
+model Psicologo {
+  id           Int              @id @default(autoincrement())
+  nroMatricula String           @unique // Actualizado según tu diagrama
+  nombre       String
+  apellido     String
+  telefono     String
+  direccion    String
+  email        String           @unique
+  
+  colegioId    Int
+  colegio      ColegioPsicologo @relation(fields: [colegioId], references: [id])
+  
+  obrasSociales ObraSocial[]    
+  lugares       Lugar[]         
+  pacientes     Paciente[]      // Nueva relación directa con Paciente (1..*)
+  turnos        Turno[]
+  liquidaciones Liquidacion[]
+}
+
+model Paciente {
+  id              Int         @id @default(autoincrement())
+  dni             String      @unique
+  nombre          String
+  apellido        String
+  telefono        String
+  fechaNacimiento DateTime
+  
+  obraSocialId    Int?
+  obraSocial      ObraSocial? @relation(fields: [obraSocialId], references: [id])
+  
+  psicologos      Psicologo[] 
+  turnos          Turno[]
+}
+
+// --- TABLAS DE TRANSACCIÓN ---
+
+model Turno {
+  id           Int         @id @default(autoincrement())
+  fecha        DateTime    @db.Date
+  horaIni      DateTime    @db.Time
+  horaFin      DateTime    @db.Time
+  estado       String      
+  modalidad    String      
+  
+  psicologoId  Int
+  psicologo    Psicologo   @relation(fields: [psicologoId], references: [id])
+  
+  tipoSesionId Int
+  tipoSesion   TipoSesion  @relation(fields: [tipoSesionId], references: [id])
+  
+  lugarId      Int?
+  lugar        Lugar?      @relation(fields: [lugarId], references: [id])
+
+  pacienteId   Int?
+  paciente     Paciente?   @relation(fields: [pacienteId], references: [id])
+}
+
+model Liquidacion {
+  id           Int         @id @default(autoincrement())
+  valorTotal   Decimal     @db.Decimal(10, 2) // Actualizado a valorTotal
+  fechaEmision DateTime    @default(now())
+  estado       String      
+  
+  psicologoId  Int
+  psicologo    Psicologo   @relation(fields: [psicologoId], references: [id])
+  
+  obraSocialId Int
+  obraSocial   ObraSocial  @relation(fields: [obraSocialId], references: [id])
+}
