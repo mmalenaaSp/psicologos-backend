@@ -53,6 +53,8 @@ model Psicologo {
   telefono     String
   direccion    String
   email        String           @unique
+  contraseña   String
+  activo       Boolean          @default(true)  //esto se hace para evitar vborrar el historial 
   
   colegioId    Int
   colegio      ColegioPsicologo @relation(fields: [colegioId], references: [id])
@@ -71,6 +73,7 @@ model Paciente {
   apellido        String
   telefono        String
   fechaNacimiento DateTime
+  activo       Boolean          @default(true) 
   
   obraSocialId    Int?
   obraSocial      ObraSocial? @relation(fields: [obraSocialId], references: [id])

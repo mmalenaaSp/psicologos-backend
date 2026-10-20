@@ -1,16 +1,22 @@
 const express = require('express');
-const cors = require('cors'); //herramienta de seguridad
+const cors = require('cors'); // herramienta de seguridad
 
-const app = express(); //crea la applicacion en si, "app" va a ser el servidor
+const app = express(); // app va a ser el servidor
 const PORT = process.env.PORT || 3000;
 
+// 1. IMPORTACIÓN: Traemos el archivo de rutas que vas a crear
+const psicologoRoutes = require('./routes/psicologoRoutes');
+
 app.use(cors()); 
-app.use(express.json()); //traduce el texto a un objeto JSON de JavaScript para poder guardarlo en Prisma.
+app.use(express.json()); // traduce el texto a un objeto JSON
 
-app.get('/', (req, res) => { //es como de prueba
+// 2. CONEXIÓN: Atamos la URL '/api/psicologos' a tus rutas
+app.use('/api/psicologos', psicologoRoutes);
+
+app.get('/', (req, res) => { // ruta de prueba
   res.send('Servidor de PsycoGest funcionando correctamente 🚀');
-}); //"Cuando alguien entre a la ruta raíz, respondé (res.send) con este texto de éxito"
+});
 
-app.listen(PORT, () => {  //prende el servidor
-  console.log(`Servidor corriendo en el puerto ${PORT}`); //aviso de que el servidor está corriendo
+app.listen(PORT, () => {  // prende el servidor
+  console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
