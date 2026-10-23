@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 // --- TABLAS CATÁLOGO ---
@@ -72,7 +73,7 @@ model Paciente {
   nombre          String
   apellido        String
   telefono        String
-  fechaNacimiento DateTime
+  fechaNacimiento DateTime    @db.Date
   activo       Boolean          @default(true) 
   
   obraSocialId    Int?
