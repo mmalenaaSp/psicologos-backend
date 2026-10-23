@@ -6,12 +6,14 @@ const PORT = process.env.PORT || 3000;
 
 // 1. IMPORTACIÓN: Traemos el archivo de rutas que vas a crear
 const psicologoRoutes = require('./routes/psicologoRoutes');
+const lugarRoutes = require('./routes/lugarRoutes');
 
 app.use(cors()); 
 app.use(express.json()); // traduce el texto a un objeto JSON
 
 // 2. CONEXIÓN: Atamos la URL '/api/psicologos' a tus rutas
 app.use('/api/psicologos', psicologoRoutes);
+app.use('/api/lugares', lugarRoutes);
 
 app.get('/', (req, res) => { // ruta de prueba
   res.send('Servidor de PsycoGest funcionando correctamente 🚀');
