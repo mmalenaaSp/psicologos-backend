@@ -73,7 +73,7 @@ model Paciente {
   nombre          String
   apellido        String
   telefono        String
-  fechaNacimiento DateTime    @db.Date
+  fechaNacimiento DateTime    
   activo       Boolean          @default(true) 
   
   obraSocialId    Int?
