@@ -5,6 +5,7 @@ const router = express.Router();
 const { 
   crearPsicologo, 
   obtenerPsicologos, 
+  obtenerPsicologoPorId,
   actualizarPsicologo, 
   borrarPsicologo 
 } = require('../controllers/psicologoController'); // Ajustá la ruta según tus carpetas
@@ -14,6 +15,7 @@ router.post('/', crearPsicologo);
 router.get('/', obtenerPsicologos);
 router.put('/:id', actualizarPsicologo);
 router.delete('/:id', borrarPsicologo);
+router.get('/:id', obtenerPsicologoPorId);
 
 // Exportamos el router para que el archivo principal de tu app lo pueda usar
 module.exports = router;

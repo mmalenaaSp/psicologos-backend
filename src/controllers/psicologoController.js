@@ -207,11 +207,12 @@ const actualizarPsicologo = async (req, res) => {
       'email',
       'colegioId'
     ];
-
+    
+    // Obtenemos los nombres de los campos enviados
     const datosEnviados = Object.keys(datosNuevos);
 
     if (
-      camposEnviados.length === 0 || camposEnviados.some(campo => !camposPermitidos.includes(campo))
+      datosEnviados.length === 0 || datosEnviados.some(campo => !camposPermitidos.includes(campo))
     ) {
       return res.status(400).json({
         error: "Campos no permitidos"
@@ -221,7 +222,7 @@ const actualizarPsicologo = async (req, res) => {
     // 4. Validamos y preparamos los datos
     const datosValidados = {};
 
-    for (const campo of camposEnviados) {
+    for (const campo of datosEnviados) {
       const valor = datosNuevos[campo];
 
       if (campo === 'colegioId') {
@@ -305,20 +306,50 @@ const actualizarPsicologo = async (req, res) => {
 };
 
 // 4. DELETE (Borrar un psicólogo - Método DELETE)
+
 const borrarPsicologo = async (req, res) => {
   try {
-    const { id } = req.params;
+    // 1. Obtenemos y validamos el ID
+    const id = Number(req.params.id);
 
-    await prisma.psicologo.update({
-      where: { id: Number(id) },
-      data: { activo: false }
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({
+        error: "ID inválido"
+      });
+    }
+
+    // 2. Realizamos la baja lógica
+    const resultado = await prisma.psicologo.updateMany({
+      where: {
+        id: id,
+        activo: true
+      },
+      data: {
+        activo: false
+      }
     });
 
-    res.status(200).json({ mensaje: "Psicólogo eliminado correctamente" });
+    // 3. Verificamos si se encontró un psicólogo activo
+    if (resultado.count === 0) {
+      return res.status(404).json({
+        error: "Psicólogo activo no encontrado"
+      });
+    }
+
+    // 4. Devolvemos la respuesta
+    return res.status(200).json({
+      mensaje: "Psicólogo dado de baja correctamente"
+    });
+
   } catch (error) {
-    res.status(500).json({ error: "Error al borrar el psicólogo" });
+    console.error("Error al borrar psicólogo:", error);
+
+    return res.status(500).json({
+      error: "Error interno al borrar el psicólogo"
+    });
   }
 };
+
 
 // Finalmente, exportamos todas las funciones para usarlas en tus rutas
 module.exports = {
