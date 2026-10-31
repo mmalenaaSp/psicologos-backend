@@ -5,6 +5,11 @@ function validarDatos(datos) {
     return { error: 'Debes enviar nombre y precio base.' };
   }
 
+  const permitidos = ['nombre', 'precioBase'];
+  if (Object.keys(datos).some(campo => !permitidos.includes(campo))) {
+    return { error: 'Se enviaron campos no permitidos.' };
+  }
+
   const nombre = datos.nombre;
   if (typeof nombre !== 'string' || !nombre.trim() || nombre.trim().length > 100) {
     return { error: 'El nombre es obligatorio y no puede superar los 100 caracteres.' };
@@ -35,7 +40,7 @@ const crearTipoSesion = async (req, res) => {
   }
 
   try {
-    const tipoSesion = await tipoSesionService.crear(validacion.data);
+    const tipoSesion = await tipoSesionService.crear(validacion.data, req.usuario.id);
     return res.status(201).json(tipoSesion);
   } catch (error) {
     console.error('Error al crear el tipo de sesión:', error);
@@ -47,7 +52,7 @@ const obtenerTiposSesion = async (req, res) => {
   const nombre = typeof req.query.nombre === 'string' ? req.query.nombre.trim() : '';
 
   try {
-    const tiposSesion = await tipoSesionService.listar(nombre);
+    const tiposSesion = await tipoSesionService.listar(nombre, req.usuario.id);
     return res.status(200).json(tiposSesion);
   } catch (error) {
     console.error('Error al listar tipos de sesión:', error);
@@ -62,7 +67,7 @@ const obtenerTipoSesionPorId = async (req, res) => {
   }
 
   try {
-    const tipoSesion = await tipoSesionService.buscarPorId(id);
+    const tipoSesion = await tipoSesionService.buscarPorId(id, req.usuario.id);
     if (!tipoSesion) {
       return res.status(404).json({ error: 'No se encontró el tipo de sesión.' });
     }
@@ -85,7 +90,7 @@ const actualizarTipoSesion = async (req, res) => {
   }
 
   try {
-    const tipoSesion = await tipoSesionService.actualizar(id, validacion.data);
+    const tipoSesion = await tipoSesionService.actualizar(id, validacion.data, req.usuario.id);
     return res.status(200).json(tipoSesion);
   } catch (error) {
     if (error.code === 'P2025') {
@@ -103,7 +108,7 @@ const borrarTipoSesion = async (req, res) => {
   }
 
   try {
-    await tipoSesionService.eliminar(id);
+    await tipoSesionService.eliminar(id, req.usuario.id);
     return res.status(200).json({ mensaje: 'Tipo de sesión eliminado correctamente.' });
   } catch (error) {
     if (error.code === 'P2025') {

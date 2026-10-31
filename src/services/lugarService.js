@@ -3,35 +3,56 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const camposRespuesta = { id: true, nombre: true, direccion: true };
 
-function listar(filtro) {
+function propiedad(propietarioId) {
+  if (!Number.isSafeInteger(propietarioId) || propietarioId <= 0) {
+    throw new Error('Se requiere un propietario autenticado.');
+  }
+  return { propietarioId };
+}
+
+function listar(filtro, propietarioId) {
   return prisma.lugar.findMany({
-    where: filtro
-      ? {
-          OR: [
-            { nombre: { contains: filtro } },
-            { direccion: { contains: filtro } }
-          ]
-        }
-      : undefined,
+    where: {
+      ...propiedad(propietarioId),
+      ...(filtro ? {
+        OR: [
+          { nombre: { contains: filtro } },
+          { direccion: { contains: filtro } }
+        ]
+      } : {})
+    },
     orderBy: { nombre: 'asc' },
     select: camposRespuesta
   });
 }
 
-function buscarPorId(id) {
-  return prisma.lugar.findUnique({ where: { id }, select: camposRespuesta });
+function buscarPorId(id, propietarioId) {
+  return prisma.lugar.findUnique({
+    where: { id, ...propiedad(propietarioId) },
+    select: camposRespuesta
+  });
 }
 
-function crear(datos) {
-  return prisma.lugar.create({ data: datos, select: camposRespuesta });
+function crear(datos, propietarioId) {
+  return prisma.lugar.create({
+    data: { ...datos, ...propiedad(propietarioId) },
+    select: camposRespuesta
+  });
 }
 
-function actualizar(id, datos) {
-  return prisma.lugar.update({ where: { id }, data: datos, select: camposRespuesta });
+function actualizar(id, datos, propietarioId) {
+  return prisma.lugar.update({
+    where: { id, ...propiedad(propietarioId) },
+    data: datos,
+    select: camposRespuesta
+  });
 }
 
-function eliminar(id) {
-  return prisma.lugar.delete({ where: { id }, select: { id: true } });
+function eliminar(id, propietarioId) {
+  return prisma.lugar.delete({
+    where: { id, ...propiedad(propietarioId) },
+    select: { id: true }
+  });
 }
 
 module.exports = { listar, buscarPorId, crear, actualizar, eliminar };

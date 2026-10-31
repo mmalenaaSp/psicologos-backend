@@ -2,106 +2,10 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-const bcrypt = require('bcrypt');
-
-//1. CREATE
+// El primer perfil se crea exclusivamente desde /api/mi-perfil.
 const crearPsicologo = async (req, res) => {
-  try {
-    const {
-      nroMatricula,
-      nombre,
-      apellido,
-      telefono,
-      direccion,
-      email,
-      password,
-      colegioId
-    } = req.body;
-
-    // 1. Validamos todos los campos obligatorios
-    const campos = {
-      nroMatricula,
-      nombre,
-      apellido,
-      telefono,
-      direccion,
-      email,
-      password
-    };
-
-    const datosInvalidos = Object.values(campos).some(
-      valor => typeof valor !== 'string' || !valor.trim()
-    );
-    //convertimos los valores del objeto en un arreglo, .some() revisa los elementos del arreglo 
-    // y devuelve true si al menos uno cumple la condición indicada.
-    //
-
-    const idColegio = Number(colegioId);
-
-    if (
-      datosInvalidos ||
-      !Number.isInteger(idColegio) ||
-      idColegio <= 0
-    ) {
-      return res.status(400).json({
-        error: "Faltan datos obligatorios o son inválidos"
-      });
-    }
-
-    // 2. Generamos un hash seguro de la contraseña
-    const passwordEncriptada = await bcrypt.hash(password, 10);
-
-    // 3. Creamos el psicólogo
-    const nuevoPsicologo = await prisma.psicologo.create({
-      data: {
-        nroMatricula: nroMatricula.trim(),
-        nombre: nombre.trim(),
-        apellido: apellido.trim(),
-        telefono: telefono.trim(),
-        direccion: direccion.trim(),
-        email: email.trim().toLowerCase(),
-        contraseña: passwordEncriptada,
-        colegioId: idColegio
-      },
-
-      // 4. Indicamos qué campos se pueden devolver
-      select: {
-        id: true,
-        nroMatricula: true,
-        nombre: true,
-        apellido: true,
-        telefono: true,
-        direccion: true,
-        email: true,
-        activo: true,
-        colegioId: true
-      }
-    });
-
-    return res.status(201).json(nuevoPsicologo);
-
-  } catch (error) {
-
-    if (error.code === 'P2002') {
-      return res.status(409).json({
-        error: "Ya existe un psicólogo con esa matrícula o email"
-      });
-    }
-
-    if (error.code === 'P2003') {
-      return res.status(400).json({
-        error: "El colegio indicado no existe"
-      });
-    }
-
-    console.error("Error al crear psicólogo:", error);
-
-    return res.status(500).json({
-      error: "Error interno al crear el psicólogo"
-    });
-  }
+  return res.status(409).json({ error: 'Perfil ya creado; us\u00e1 Mi perfil.' });
 };
-
 
 // 2. READ (Obtener todos los psicólogos - Método GET)
 
@@ -109,7 +13,8 @@ const obtenerPsicologos = async (req, res) => {
   try {
     const listaPsicologos = await prisma.psicologo.findMany({
       where: {
-        activo: true
+        activo: true,
+        id: req.usuario.psicologoId
       },
       select: {
         id: true,
@@ -144,7 +49,7 @@ const obtenerPsicologoPorId = async (req, res) => {
 
     const psicologo = await prisma.psicologo.findFirst({
       where: {
-        id: id,
+        AND: [{ id }, { id: req.usuario.psicologoId }],
         activo: true
       },
       select: {
@@ -236,6 +141,13 @@ const actualizarPsicologo = async (req, res) => {
           });
         }
 
+        const colegio = await prisma.colegioPsicologo.findFirst({
+          where: { id: Number(valor), OR: [{ propietarioId: req.usuario.id }, { propietarioId: null }] },
+          select: { id: true }
+        });
+        if (!colegio) {
+          return res.status(400).json({ error: 'El colegio indicado no est\u00e1 disponible.' });
+        }
         datosValidados.colegioId = Number(valor);
       } else {
         if (typeof valor !== 'string' || !valor.trim()) {
@@ -254,7 +166,7 @@ const actualizarPsicologo = async (req, res) => {
     // 5. Actualizamos solamente si está activo
     const resultado = await prisma.psicologo.updateMany({
       where: {
-        id: id,
+        AND: [{ id }, { id: req.usuario.psicologoId }],
         activo: true
       },
       data: datosValidados
@@ -267,8 +179,8 @@ const actualizarPsicologo = async (req, res) => {
     }
 
     // 6. Obtenemos los datos que podemos devolver
-    const psicologoActualizado = await prisma.psicologo.findUnique({
-      where: { id: id },
+    const psicologoActualizado = await prisma.psicologo.findFirst({
+      where: { AND: [{ id }, { id: req.usuario.psicologoId }], activo: true },
       select: {
         id: true,
         nroMatricula: true,
@@ -321,7 +233,7 @@ const borrarPsicologo = async (req, res) => {
     // 2. Realizamos la baja lógica
     const resultado = await prisma.psicologo.updateMany({
       where: {
-        id: id,
+        AND: [{ id }, { id: req.usuario.psicologoId }],
         activo: true
       },
       data: {

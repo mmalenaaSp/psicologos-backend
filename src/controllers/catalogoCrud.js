@@ -93,6 +93,7 @@ function crearCrudCatalogo({ modelo, campos, relaciones = [] }) {
   async function listar(req, res) {
     try {
       const registros = await entidad.findMany({
+        where: { OR: [{ propietarioId: req.usuario.id }, { propietarioId: null }] },
         orderBy: { id: 'asc' }
       });
 
@@ -111,8 +112,8 @@ function crearCrudCatalogo({ modelo, campos, relaciones = [] }) {
     }
 
     try {
-      const registro = await entidad.findUnique({
-        where: { id }
+      const registro = await entidad.findFirst({
+        where: { id, OR: [{ propietarioId: req.usuario.id }, { propietarioId: null }] }
       });
 
       if (!registro) {
@@ -139,7 +140,7 @@ function crearCrudCatalogo({ modelo, campos, relaciones = [] }) {
 
     try {
       const nuevo = await entidad.create({
-        data: resultado.datos
+        data: { ...resultado.datos, propietarioId: req.usuario.id }
       });
 
       return res.status(201).json(nuevo);
@@ -166,7 +167,7 @@ function crearCrudCatalogo({ modelo, campos, relaciones = [] }) {
 
     try {
       const actualizado = await entidad.update({
-        where: { id },
+        where: { id, propietarioId: req.usuario.id },
         data: resultado.datos
       });
 
@@ -185,7 +186,7 @@ function crearCrudCatalogo({ modelo, campos, relaciones = [] }) {
     }
 
     try {
-      const opciones = { where: { id } };
+      const opciones = { where: { id, propietarioId: req.usuario.id } };
 
       if (relaciones.length > 0) {
         const select = Object.fromEntries(
@@ -215,7 +216,7 @@ function crearCrudCatalogo({ modelo, campos, relaciones = [] }) {
       }
 
       await entidad.delete({
-        where: { id }
+        where: { id, propietarioId: req.usuario.id }
       });
 
       return res.json({

@@ -5,6 +5,11 @@ const prisma = new PrismaClient();
 // CREATE: Crear un paciente
 const crearPaciente = async (req, res) => {
   try {
+    const permitidos = ['dni', 'nombre', 'apellido', 'telefono', 'fechaNacimiento', 'obraSocialId'];
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body) ||
+        Object.keys(req.body).some(campo => !permitidos.includes(campo))) {
+      return res.status(400).json({ error: 'Se enviaron campos no permitidos.' });
+    }
     const {
       dni,
       nombre,
@@ -65,6 +70,13 @@ const crearPaciente = async (req, res) => {
         });
       }
 
+      const obraSocial = await prisma.obraSocial.findFirst({
+        where: { id, OR: [{ propietarioId: req.usuario.id }, { propietarioId: null }] },
+        select: { id: true }
+      });
+      if (!obraSocial) {
+        return res.status(400).json({ error: 'La obra social indicada no est\u00e1 disponible.' });
+      }
       idObraSocial = id;
     }
 
@@ -76,7 +88,8 @@ const crearPaciente = async (req, res) => {
         apellido: apellido.trim(),
         telefono: telefono.trim(),
         fechaNacimiento: fecha,
-        obraSocialId: idObraSocial
+        obraSocialId: idObraSocial,
+        propietarioId: req.usuario.id
       }
     });
 
@@ -108,7 +121,8 @@ const obtenerPacientes = async (req, res) => {
   try {
     const pacientes = await prisma.paciente.findMany({
       where: {
-        activo: true
+        activo: true,
+        propietarioId: req.usuario.id
       },
       orderBy: {
         id: 'asc'
@@ -143,7 +157,8 @@ const obtenerPacientePorId = async (req, res) => {
     const paciente = await prisma.paciente.findFirst({
       where: {
         id: pacienteId,
-        activo: true
+        activo: true,
+        propietarioId: req.usuario.id
       }
     });
 
@@ -299,6 +314,13 @@ const actualizarPaciente = async (req, res) => {
           });
         }
 
+        const obraSocial = await prisma.obraSocial.findFirst({
+          where: { id: idObraSocial, OR: [{ propietarioId: req.usuario.id }, { propietarioId: null }] },
+          select: { id: true }
+        });
+        if (!obraSocial) {
+          return res.status(400).json({ error: 'La obra social indicada no est\u00e1 disponible.' });
+        }
         datosActualizados.obraSocialId = idObraSocial;
       }
     }
@@ -307,7 +329,8 @@ const actualizarPaciente = async (req, res) => {
     const resultado = await prisma.paciente.updateMany({
       where: {
         id: pacienteId,
-        activo: true
+        activo: true,
+        propietarioId: req.usuario.id
       },
       data: datosActualizados
     });
@@ -322,7 +345,8 @@ const actualizarPaciente = async (req, res) => {
     const pacienteActualizado =
       await prisma.paciente.findUnique({
         where: {
-          id: pacienteId
+          id: pacienteId,
+          propietarioId: req.usuario.id
         }
       });
 
@@ -371,7 +395,8 @@ const borrarPaciente = async (req, res) => {
     const resultado = await prisma.paciente.updateMany({
       where: {
         id: pacienteId,
-        activo: true
+        activo: true,
+        propietarioId: req.usuario.id
       },
       data: {
         activo: false
