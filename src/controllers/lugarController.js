@@ -10,6 +10,11 @@ function validarDatos(datos) {
     return { error: 'Debes enviar nombre y dirección.' };
   }
 
+  const permitidos = ['nombre', 'direccion'];
+  if (Object.keys(datos).some(campo => !permitidos.includes(campo))) {
+    return { error: 'Se enviaron campos no permitidos.' };
+  }
+
   const nombre = datos.nombre;
   const direccion = datos.direccion;
   if (typeof nombre !== 'string' || !nombre.trim() || nombre.trim().length > 100) {
@@ -27,7 +32,7 @@ const crearLugar = async (req, res) => {
   if (validacion.error) return res.status(400).json({ error: validacion.error });
 
   try {
-    const lugar = await lugarService.crear(validacion.data);
+    const lugar = await lugarService.crear(validacion.data, req.usuario.id);
     return res.status(201).json(lugar);
   } catch (error) {
     console.error('Error al crear el lugar:', error);
@@ -38,7 +43,7 @@ const crearLugar = async (req, res) => {
 const obtenerLugares = async (req, res) => {
   const filtro = typeof req.query.filtro === 'string' ? req.query.filtro.trim() : '';
   try {
-    const lugares = await lugarService.listar(filtro);
+    const lugares = await lugarService.listar(filtro, req.usuario.id);
     return res.status(200).json(lugares);
   } catch (error) {
     console.error('Error al listar lugares:', error);
@@ -51,7 +56,7 @@ const obtenerLugarPorId = async (req, res) => {
   if (!id) return res.status(400).json({ error: 'El ID debe ser un entero positivo.' });
 
   try {
-    const lugar = await lugarService.buscarPorId(id);
+    const lugar = await lugarService.buscarPorId(id, req.usuario.id);
     if (!lugar) return res.status(404).json({ error: 'No se encontró el lugar.' });
     return res.status(200).json(lugar);
   } catch (error) {
@@ -68,7 +73,7 @@ const actualizarLugar = async (req, res) => {
   if (validacion.error) return res.status(400).json({ error: validacion.error });
 
   try {
-    const lugar = await lugarService.actualizar(id, validacion.data);
+    const lugar = await lugarService.actualizar(id, validacion.data, req.usuario.id);
     return res.status(200).json(lugar);
   } catch (error) {
     if (error.code === 'P2025') {
@@ -84,7 +89,7 @@ const borrarLugar = async (req, res) => {
   if (!id) return res.status(400).json({ error: 'El ID debe ser un entero positivo.' });
 
   try {
-    await lugarService.eliminar(id);
+    await lugarService.eliminar(id, req.usuario.id);
     return res.status(200).json({ mensaje: 'Lugar eliminado correctamente.' });
   } catch (error) {
     if (error.code === 'P2025') {

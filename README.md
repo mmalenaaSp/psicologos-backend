@@ -19,8 +19,8 @@ Este repositorio contiene el **backend** y su API REST. El proyecto todavía se 
 | Lugar y Tipo de Sesión | En desarrollo / pendiente de integración |
 | Colegio de Psicólogos y Obra Social | En desarrollo / pendiente de integración |
 | Turnos y liquidaciones | Pendiente |
-| Autenticación y autorización | Pendiente |
-| Pruebas automatizadas | Pendiente |
+| Autenticación y autorización | Sesiones en cookie HttpOnly y permisos por rol |
+| Pruebas automatizadas | HTTP, perfiles y aislamiento con datos ficticios |
 
 > Los modelos definidos en Prisma no implican que todos sus endpoints estén implementados.
 
@@ -185,7 +185,7 @@ Las actualizaciones mediante `PUT` actualmente aceptan **campos parciales**, seg
 
 ## Pruebas y respuestas HTTP
 
-Los CRUD de Psicólogo y Paciente se probaron manualmente con Thunder Client. Se verificaron operaciones correctas y distintos casos de error. Aún no hay una suite automatizada de pruebas.
+Los CRUD de Psicólogo y Paciente se probaron manualmente con Thunder Client. Se verificaron operaciones correctas y distintos casos de error. La suite automatizada se ejecuta con `npm test` y reemplaza Prisma por almacenamiento en memoria: no accede a `DATABASE_URL`.
 
 Los controladores utilizan, según el caso, estos códigos:
 
@@ -233,10 +233,47 @@ No subir `node_modules`, `.env` ni archivos con datos personales de pacientes.
 
 ## Seguridad y trabajo pendiente
 
-**Este backend está en desarrollo y no debe utilizarse con información real de pacientes ni exponerse públicamente sin incorporar autenticación, autorización y otras medidas de seguridad.** Para las pruebas utilizar datos ficticios.
+El login y los permisos por rol están implementados. La validación usa datos ficticios: pruebas en memoria, navegador con API aislada y una base MySQL local nueva de pruebas.
 
 Próximos pasos: integrar los CRUD restantes, implementar los casos de uso de turnos y liquidaciones, agregar pruebas automatizadas y ampliar la documentación de la API.
 
 ## Repositorio
 
 [GitHub — PsycoGest Backend](https://github.com/mmalenaaSp/psicologos-backend)
+
+## Registro y perfiles propios
+
+El registro PACIENTE/PSICOLOGO crea una cuenta ACTIVO sin fichas asociadas y permite iniciar sesión inmediatamente. Login y /auth/me incluyen perfilCompleto. Si falta el perfil, sólo se habilitan su formulario propio, sesión y logout. Las cuentas PENDIENTE anteriores también pueden completar su perfil; sólo ese guardado cambia su estado, sin actualizar usuarios masivamente. BLOQUEADO sigue sin acceso.
+
+GET /api/mi-perfil devuelve {usuario, perfil}; PUT crea o edita exclusivamente ese perfil dentro de una transacción Serializable. GET /api/mi-perfil/opciones devuelve colegios/obras propios o compartidos, sin datos clínicos. No se aceptan IDs de fichas, rol ni propietario en el formulario. Un conflicto de DNI/correo/matrícula devuelve 409 y no vincula fichas anteriores.
+
+Paciente: nombre, apellido, teléfono, DNI y fechaNacimiento AAAA-MM-DD; obraSocialId opcional. Profesional: nombre, apellido, teléfono, dirección, nroMatricula y colegioId. También admite colegio: {nombre, distrito, direccion} para crearlo en la misma transacción. Correo y hash del campo legado obligatorio Psicologo.contraseña proceden de la cuenta autenticada. No se devuelven hashes. Se retiró el comando account:activate; no hay aprobación manual.
+
+Los CRUD exigen sesión, rol PSICOLOGO y perfil completo. Pacientes, lugares y tipos de sesión se consultan/modifican sólo por propietarioId del usuario; las fichas anteriores con NULL quedan aisladas. Psicólogos sólo permite su propio perfil; su primera creación se hace en /mi-perfil y crear un segundo devuelve 409. Colegios/obras permiten lectura de propios y compartidos NULL, pero modificación sólo de propios. Se verifica propiedad en cada consulta, incluyendo GET por ID, PUT y DELETE. El paciente usa exclusivamente /mi-perfil. Completar una matrícula no verifica identidad profesional ni habilita información clínica preexistente.
+
+La migración aditiva 20261031010000_propietarios_registros agrega propietarios opcionales e índices sin eliminar ni reasignar datos. Antes de usar el código con una base local de pruebas, aplicar las migraciones pendientes con npx prisma migrate deploy y generar con npx prisma generate. En la base local de desarrollo se aplicaron sólo las migraciones aditivas de Sesion y propietarios. No se consultaron ni reasignaron fichas, ni se cambiaron estados de usuarios.
+
+Configuración: .env.example. FRONTEND_URL debe ser el origen exacto del frontend (http://localhost:5173 por defecto). Las solicitudes POST/PUT/PATCH usan application/json y el frontend envía cookies. Sesión de cuatro horas, cookie HttpOnly y SameSite=Strict; Secure con HTTPS en producción. La base conserva el hash del token.
+
+Pruebas: npm test usa Prisma en memoria y datos ficticios, sin consultar DATABASE_URL. Cubre ambos roles, perfil incompleto, estado pendiente anterior, aislamiento entre cuentas y fichas NULL, conflictos sin vinculación, validaciones, logout, cookies, origen y límite de intentos. El frontend ofrece npm run test:ui con Edge/Chrome temporal y API ficticia aislada.
+
+### Prueba MySQL real y bases aisladas
+
+El script scripts/verificar-mysql.cjs requiere la variable RUN_ISOLATED_MYSQL_TEST=1. Usa las credenciales locales en memoria para crear una base nueva aleatoria en el mismo MySQL local, aplica migraciones sólo allí y prueba HTTP con Prisma real. No consulta tablas de la base original, no cambia .env, no imprime credenciales y no ejecuta DROP. Cada ejecución conserva su base ficticia de pruebas.
+
+La ejecución final pasó 103 comprobaciones de registro, sesiones, perfiles, concurrencia, CRUD propios y rechazo de accesos ajenos. El primer intento detectó un filtro nullable de Prisma que ya se corrigió.
+
+Bases de prueba conservadas:
+
+- Intento inicial: psycogest_codex_test_mvvnrhra_360cd3114d177ba1
+- Ejecución exitosa: psycogest_codex_test_mvvnt1xa_fe103fd4e66f0090
+
+Después de validar las pruebas aisladas, se aplicaron en la base local de desarrollo las dos migraciones pendientes: Sesion y propietarios. No se ejecutaron migraciones destructivas ni se leyeron datos clínicos. El script de prueba sólo trabaja con su propia base aleatoria.
+
+## Turnos, reservas y liquidaciones
+
+Implementación, migración, archivos, pruebas y recorrido manual: [IMPLEMENTACION_TURNOS.md](IMPLEMENTACION_TURNOS.md).
+
+## Perfil público profesional
+
+Edición de la presentación, fotos por URL, detalle público, migración y pruebas: [IMPLEMENTACION_PERFIL_PUBLICO.md](IMPLEMENTACION_PERFIL_PUBLICO.md).
