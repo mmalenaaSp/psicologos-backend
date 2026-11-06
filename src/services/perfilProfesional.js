@@ -6,29 +6,44 @@ const camposTexto = Object.freeze({
   dirigidoA: 500,
   idiomas: 191,
 });
+
 const camposPublicos = Object.freeze([...Object.keys(camposTexto), 'modalidadPublica', 'aceptaReintegro']);
 const seleccionCamposPublicos = Object.fromEntries(camposPublicos.map(campo => [campo, true]));
+
 const seleccionLugar = { id: true, nombre: true, direccion: true };
-const seleccionPerfil = { ...seleccionCamposPublicos, lugares: { select: { id: true } } };
+const seleccionObraSocial = { id: true, codigo: true, nombre: true };
+
+// Actualizamos las selecciones de Prisma para traer las relaciones
+const seleccionPerfil = { 
+  ...seleccionCamposPublicos, 
+  lugares: { select: { id: true } },
+  obrasSociales: { select: { id: true } } 
+};
+
 const filtroProfesionalPublico = { activo: true, usuario: { is: { estado: 'ACTIVO', rol: 'PSICOLOGO' } } };
+
 const seleccionPublica = {
   id: true, nombre: true, apellido: true, nroMatricula: true,
   ...seleccionCamposPublicos,
   obrasSociales: { select: { id: true, nombre: true } },
   lugares: { select: seleccionLugar },
 };
+
 class ErrorPerfilProfesional extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
+
 const rechazar = (message) => { throw new ErrorPerfilProfesional(400, message); };
+
 function idPositivo(valor) {
   if (!['number', 'string'].includes(typeof valor) || !/^[1-9]\d*$/.test(String(valor)) || !Number.isSafeInteger(Number(valor)) || Number(valor) > 2147483647) {
     rechazar('El identificador debe ser un entero positivo.');
   }
   return Number(valor);
 }
+
 function validarEdicion(body) {
-  if (!body || typeof body !== 'object' || Array.isArray(body) || !Object.keys(body).length || Object.keys(body).some(campo => ![...camposPublicos, 'lugaresIds'].includes(campo))) {
+  if (!body || typeof body !== 'object' || Array.isArray(body) || !Object.keys(body).length || Object.keys(body).some(campo => ![...camposPublicos, 'lugaresIds', 'obrasSocialesIds'].includes(campo))) {
     rechazar('El perfil profesional contiene campos no permitidos.');
   }
   const datos = {};
@@ -63,11 +78,18 @@ function validarEdicion(body) {
     if (!Array.isArray(body.lugaresIds) || body.lugaresIds.length > 100) rechazar('Seleccioná hasta 100 lugares de atención.');
     datos.lugaresIds = [...new Set(body.lugaresIds.map(idPositivo))];
   }
+  // Nueva validación para Obras Sociales
+  if (Object.hasOwn(body, 'obrasSocialesIds')) {
+    if (!Array.isArray(body.obrasSocialesIds) || body.obrasSocialesIds.length > 100) rechazar('Seleccioná hasta 100 obras sociales.');
+    datos.obrasSocialesIds = [...new Set(body.obrasSocialesIds.map(idPositivo))];
+  }
   return datos;
 }
+
 function proyectarCampos(perfil) {
   return Object.fromEntries(camposPublicos.map(campo => [campo, perfil[campo] ?? (campo === 'aceptaReintegro' ? false : null)]));
 }
+
 function proyectarPublico(perfil) {
   if (!perfil) return null;
   return {
@@ -77,12 +99,19 @@ function proyectarPublico(perfil) {
     lugares: (perfil.lugares || []).map(({ id, nombre, direccion }) => ({ id, nombre, direccion })),
   };
 }
-function respuestaPrivada(perfil, lugares) {
+
+function respuestaPrivada(perfil, lugares, obrasSocialesGlobales) {
   return {
-    perfil: { ...proyectarCampos(perfil), lugaresIds: (perfil.lugares || []).map(lugar => lugar.id) },
+    perfil: { 
+      ...proyectarCampos(perfil), 
+      lugaresIds: (perfil.lugares || []).map(lugar => lugar.id),
+      obrasSocialesIds: (perfil.obrasSociales || []).map(obra => obra.id)
+    },
     lugaresDisponibles: lugares.map(({ id, nombre, direccion }) => ({ id, nombre, direccion })),
+    obrasSocialesDisponibles: obrasSocialesGlobales.map(({ id, codigo, nombre }) => ({ id, codigo, nombre }))
   };
 }
+
 function dondePropio(usuario) {
   if (usuario?.rol !== 'PSICOLOGO' || !usuario.perfilCompleto || usuario.psicologoId == null) {
     throw new ErrorPerfilProfesional(403, 'Completá tu perfil de profesional para acceder.');
@@ -92,37 +121,58 @@ function dondePropio(usuario) {
     usuario: { is: { id: idPositivo(usuario.id), estado: 'ACTIVO', rol: 'PSICOLOGO' } },
   };
 }
+
 function crearServicioPerfilProfesional(prisma) {
   const lugaresPropios = (db, usuario) => db.lugar.findMany({
     where: { propietarioId: usuario.id }, select: seleccionLugar, orderBy: { nombre: 'asc' },
   });
+
+  // Consulta el catálogo global de Obras Sociales
+  const obrasSocialesGlobales = (db) => db.obraSocial.findMany({
+    select: seleccionObraSocial, orderBy: { nombre: 'asc' },
+  });
+
   return {
     async obtenerPrivado(usuario) {
       const where = dondePropio(usuario);
-      const [perfil, lugares] = await Promise.all([
+      const [perfil, lugares, obras] = await Promise.all([
         prisma.psicologo.findFirst({ where, select: seleccionPerfil }),
         lugaresPropios(prisma, usuario),
+        obrasSocialesGlobales(prisma)
       ]);
       if (!perfil) throw new ErrorPerfilProfesional(404, 'Perfil profesional no encontrado.');
-      return respuestaPrivada(perfil, lugares);
+      return respuestaPrivada(perfil, lugares, obras);
     },
+
     async guardarPrivado(usuario, body) {
       const where = dondePropio(usuario);
-      const { lugaresIds, ...datos } = validarEdicion(body);
+      const { lugaresIds, obrasSocialesIds, ...datos } = validarEdicion(body);
+
       return prisma.$transaction(async tx => {
         if (!await tx.psicologo.findFirst({ where, select: { id: true } })) {
           throw new ErrorPerfilProfesional(404, 'Perfil profesional no encontrado.');
         }
+        
         if (lugaresIds !== undefined) {
-          // Publicar una dirección requiere seleccionar explícitamente un Lugar propio.
           const permitidos = await tx.lugar.findMany({ where: { id: { in: lugaresIds }, propietarioId: usuario.id }, select: { id: true } });
           if (permitidos.length !== lugaresIds.length) rechazar('Uno de los lugares no te pertenece o ya no está disponible.');
           datos.lugares = { set: lugaresIds.map(id => ({ id })) };
         }
+
+        // Validación y vinculación de Obras Sociales (Catálogo Global)
+        if (obrasSocialesIds !== undefined) {
+          const existentes = await tx.obraSocial.findMany({ where: { id: { in: obrasSocialesIds } }, select: { id: true } });
+          if (existentes.length !== obrasSocialesIds.length) rechazar('Una de las obras sociales seleccionadas no existe.');
+          datos.obrasSociales = { set: obrasSocialesIds.map(id => ({ id })) };
+        }
+
         const perfil = await tx.psicologo.update({ where, data: datos, select: seleccionPerfil });
-        return respuestaPrivada(perfil, await lugaresPropios(tx, usuario));
+        const [lugares, obras] = await Promise.all([lugaresPropios(tx, usuario), obrasSocialesGlobales(tx)]);
+
+        return respuestaPrivada(perfil, lugares, obras);
       }, { isolationLevel: 'Serializable' });
     },
+
     async obtenerPublico(valor) {
       const perfil = await prisma.psicologo.findFirst({ where: { id: idPositivo(valor), ...filtroProfesionalPublico }, select: seleccionPublica });
       if (!perfil) throw new ErrorPerfilProfesional(404, 'Profesional no encontrado.');
@@ -130,6 +180,7 @@ function crearServicioPerfilProfesional(prisma) {
     },
   };
 }
+
 module.exports = {
   crearServicioPerfilProfesional, validarEdicion, proyectarPublico, seleccionCamposPublicos,
   filtroProfesionalPublico, ErrorPerfilProfesional,

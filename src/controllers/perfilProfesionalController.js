@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { crearServicioPerfilProfesional, ErrorPerfilProfesional } = require('../services/perfilProfesional');
 const servicio = crearServicioPerfilProfesional(new PrismaClient());
+
 const manejar = fn => async (req, res) => {
   try { return res.json(await fn(req)); }
   catch (error) {
@@ -11,8 +12,13 @@ const manejar = fn => async (req, res) => {
     return res.status(500).json({ error: 'No se pudo completar la operación del perfil profesional.' });
   }
 };
+
 module.exports = {
   obtenerPrivado: manejar(req => servicio.obtenerPrivado(req.usuario)),
   guardarPrivado: manejar(req => servicio.guardarPrivado(req.usuario, req.body)),
   obtenerPublico: manejar(req => servicio.obtenerPublico(req.params.id)),
+  
+  // Nuevos métodos para Obras Sociales
+  obtenerObrasSociales: manejar(req => servicio.obtenerObrasSociales(req.usuario)),
+  actualizarObrasSociales: manejar(req => servicio.actualizarObrasSociales(req.usuario, req.body.obrasSocialesIds)),
 };

@@ -11,21 +11,20 @@ datasource db {
 
 model ColegioPsicologo {
   propietarioId Int?
-  propietario Usuario? @relation("PropietarioColegioPsicologo", fields: [propietarioId], references: [id], onDelete: Restrict)
+  propietario   Usuario? @relation("PropietarioColegioPsicologo", fields: [propietarioId], references: [id], onDelete: Restrict)
 
   id        Int    @id @default(autoincrement())
   distrito  String
   nombre    String
-  direccion String // Agregado según tu nuevo diagrama
+  direccion String
 
   psicologos Psicologo[]
   @@index([propietarioId])
-
 }
 
 model ObraSocial {
   propietarioId Int?
-  propietario Usuario? @relation("PropietarioObraSocial", fields: [propietarioId], references: [id], onDelete: Restrict)
+  propietario   Usuario? @relation("PropietarioObraSocial", fields: [propietarioId], references: [id], onDelete: Restrict)
 
   id     Int    @id @default(autoincrement())
   codigo String @unique
@@ -35,63 +34,62 @@ model ObraSocial {
   liquidaciones Liquidacion[]
   psicologos    Psicologo[]
   @@index([propietarioId])
-
 }
 
 model TipoSesion {
   propietarioId Int?
-  propietario Usuario? @relation("PropietarioTipoSesion", fields: [propietarioId], references: [id], onDelete: Restrict)
+  propietario   Usuario? @relation("PropietarioTipoSesion", fields: [propietarioId], references: [id], onDelete: Restrict)
 
   id         Int     @id @default(autoincrement())
   nombre     String
   precioBase Decimal @db.Decimal(10, 2)
   turnos     Turno[]
   @@index([propietarioId])
-
 }
 
 model Lugar {
   propietarioId Int?
-  propietario Usuario? @relation("PropietarioLugar", fields: [propietarioId], references: [id], onDelete: Restrict)
+  propietario   Usuario? @relation("PropietarioLugar", fields: [propietarioId], references: [id], onDelete: Restrict)
 
   id        Int    @id @default(autoincrement())
   nombre    String
   direccion String
 
   turnos     Turno[]
-  psicologos Psicologo[] // Nueva relación directa desde Psicólogo (1..*)
+  psicologos Psicologo[]
   @@index([propietarioId])
-
 }
 
 // --- TABLAS PRINCIPALES ---
 
 model Psicologo {
   id           Int     @id @default(autoincrement())
-  nroMatricula String  @unique // Actualizado según tu diagrama
+  nroMatricula String  @unique
   nombre       String
   apellido     String
   telefono     String
   direccion    String
   email        String  @unique
-  contraseña  String
-  activo       Boolean @default(true) //esto se hace para evitar vborrar el historial
+  contraseña   String
+  activo       Boolean @default(true)
 
-  // Presentación pública opcional; no interviene en el onboarding.
-  fotoUrl             String? @db.VarChar(2048)
-  tituloProfesional   String? @db.VarChar(191)
-  enfoqueProfesional  String? @db.VarChar(191)
-  descripcionPublica  String? @db.Text
-  dirigidoA           String? @db.VarChar(500)
-  idiomas             String? @db.VarChar(191)
+  // Presentación pública opcional
+  fotoUrl             String?           @db.VarChar(2048)
+  tituloProfesional   String?           @db.VarChar(191)
+  enfoqueProfesional  String?           @db.VarChar(191)
+  descripcionPublica  String?           @db.Text
+  dirigidoA           String?           @db.VarChar(500)
+  idiomas             String?           @db.VarChar(191)
   modalidadPublica    ModalidadPublica?
-  aceptaReintegro     Boolean @default(false)
+  aceptaReintegro     Boolean           @default(false)
+
   colegioId Int
   colegio   ColegioPsicologo @relation(fields: [colegioId], references: [id])
 
+  // Catálogo de Obras Sociales que atiende este profesional específico
   obrasSociales ObraSocial[]
   lugares       Lugar[]
-  pacientes     Paciente[] // Nueva relación directa con Paciente (1..*)
+  pacientes     Paciente[]
   turnos        Turno[]
   liquidaciones Liquidacion[]
 
@@ -100,7 +98,7 @@ model Psicologo {
 
 model Paciente {
   propietarioId Int?
-  propietario Usuario? @relation("PropietarioPaciente", fields: [propietarioId], references: [id], onDelete: Restrict)
+  propietario   Usuario? @relation("PropietarioPaciente", fields: [propietarioId], references: [id], onDelete: Restrict)
 
   id              Int      @id @default(autoincrement())
   dni             String   @unique
@@ -118,19 +116,18 @@ model Paciente {
 
   usuario Usuario? @relation("PerfilPaciente")
   @@index([propietarioId])
-
 }
 
 // --- TABLAS DE TRANSACCIÓN ---
 
 model Turno {
   detalleLiquidacion LiquidacionDetalle?
-  id        Int      @id @default(autoincrement())
-  fecha     DateTime @db.Date
-  horaIni   DateTime @db.Time
-  horaFin   DateTime @db.Time
-  estado    String
-  modalidad String
+  id                 Int                @id @default(autoincrement())
+  fecha              DateTime           @db.Date
+  horaIni            DateTime           @db.Time
+  horaFin            DateTime           @db.Time
+  estado             String
+  modalidad          String
 
   psicologoId Int
   psicologo   Psicologo @relation(fields: [psicologoId], references: [id])
@@ -146,10 +143,10 @@ model Turno {
 }
 
 model Liquidacion {
-  detalles LiquidacionDetalle[]
-  id           Int      @id @default(autoincrement())
-  valorTotal   Decimal  @db.Decimal(10, 2) // Actualizado a valorTotal
-  fechaEmision DateTime @default(now())
+  detalles     LiquidacionDetalle[]
+  id           Int                  @id @default(autoincrement())
+  valorTotal   Decimal              @db.Decimal(10, 2)
+  fechaEmision DateTime             @default(now())
   estado       String
 
   psicologoId Int
@@ -164,6 +161,7 @@ enum ModalidadPublica {
   VIRTUAL
   AMBAS
 }
+
 enum RolUsuario {
   PSICOLOGO
   PACIENTE
@@ -177,10 +175,10 @@ enum EstadoUsuario {
 
 model Usuario {
   registrosColegioPsicologo ColegioPsicologo[] @relation("PropietarioColegioPsicologo")
-  registrosObraSocial ObraSocial[] @relation("PropietarioObraSocial")
-  registrosTipoSesion TipoSesion[] @relation("PropietarioTipoSesion")
-  registrosLugar Lugar[] @relation("PropietarioLugar")
-  registrosPaciente Paciente[] @relation("PropietarioPaciente")
+  registrosObraSocial       ObraSocial[]       @relation("PropietarioObraSocial")
+  registrosTipoSesion       TipoSesion[]       @relation("PropietarioTipoSesion")
+  registrosLugar            Lugar[]            @relation("PropietarioLugar")
+  registrosPaciente         Paciente[]         @relation("PropietarioPaciente")
 
   id           Int           @id @default(autoincrement())
   email        String        @unique
@@ -191,15 +189,13 @@ model Usuario {
   psicologoId Int? @unique
   pacienteId  Int? @unique
 
-  sesiones Sesion[]
+  sesiones  Sesion[]
   psicologo Psicologo? @relation(fields: [psicologoId], references: [id])
   paciente  Paciente?  @relation("PerfilPaciente", fields: [pacienteId], references: [id])
 
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
-
 }
-
 
 model Sesion {
   id        Int      @id @default(autoincrement())
@@ -214,16 +210,16 @@ model Sesion {
   @@index([expiraEn])
 }
 
-// Importe y descripción congelados al emitir; no se recalculan con el precio base.
 model LiquidacionDetalle {
-  id Int @id @default(autoincrement())
+  id            Int         @id @default(autoincrement())
   liquidacionId Int
-  liquidacion Liquidacion @relation(fields: [liquidacionId], references: [id], onDelete: Restrict)
-  turnoId Int @unique
-  turno Turno @relation(fields: [turnoId], references: [id], onDelete: Restrict)
-  importe Decimal @db.Decimal(10, 2)
-  sesion String
-  fechaSesion DateTime @db.Date
-  paciente String
+  liquidacion   Liquidacion @relation(fields: [liquidacionId], references: [id], onDelete: Restrict)
+  turnoId       Int         @unique
+  turno         Turno       @relation(fields: [turnoId], references: [id], onDelete: Restrict)
+  importe       Decimal     @db.Decimal(10, 2)
+  sesion        String
+  fechaSesion   DateTime    @db.Date
+  paciente      String
+
   @@index([liquidacionId])
 }
